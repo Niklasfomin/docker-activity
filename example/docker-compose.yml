@@ -1,8 +1,9 @@
-version: '3'
+version: "3"
 
 services:
   activity:
     image: jdrouet/docker-activity:canary
+    privileged: true
     build: ..
     # command: file --format json /data/output.jsonp
     command: tcp-socket --format json vector:9000
@@ -12,30 +13,24 @@ services:
       - /sys/class/powercap:/sys/class/powercap:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - storage:/data
+    depends_on:
+      - vector
 
   vector:
     image: timberio/vector:latest-alpine
     networks:
       - backend
     ports:
-      - 9091:9090
+      - "9091:9090" # for Prometheus
+      - "9000:9000" # for docker-activity input
+      - "9001:9001" # for Vector API (optional)
     volumes:
       - ./vector.toml:/etc/vector/vector.toml:ro
       - storage:/data:ro
-
-  prometheus:
-    image: bitnami/prometheus:latest
-    networks:
-      - backend
-    ports:
-      - 9090:9090
-    volumes:
-      - ./prometheus.yml:/opt/bitnami/prometheus/conf/prometheus.yml:ro
-      - /etc/timezone:/etc/timezone:ro
-
+    entrypoint: ["/usr/local/bin/vector"]
+    command: ["--config", "/etc/vector/vector.toml"]
 networks:
   backend: {}
 
 volumes:
   storage: {}
-
